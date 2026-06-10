@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(java *)",
+      "PowerShell(mvn *)",
+      "PowerShell(rg --version 2>&1)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(where.exe java 2>&1; where.exe mvn 2>&1; $env:JAVA_HOME 2>&1; $env:M2_HOME 2>&1)",
+      "PowerShell(choco list *)",
+      "PowerShell(winget *)",
+      "WebSearch",
+      "PowerShell(ls *)",
+      "PowerShell($bytes = Get-Content \"D:\\\\AAA_xmx\\\\javaProject\\\\paicli-main\\\\run.bat\" -Encoding Byte -Raw; $crlf = [System.Text.Encoding]::UTF8.GetBytes\\(\"`r`n\"\\); $lf = [System.Text.Encoding]::UTF8.GetBytes\\(\"`n\"\\); $i=0; $crlfCount=0; $lfCount=0; while\\($i -lt $bytes.Length-1\\) { if\\($bytes[$i] -eq 13 -and $bytes[$i+1] -eq 10\\) { $crlfCount++; $i+=2 } elseif\\($bytes[$i] -eq 10\\) { $lfCount++; $i++ } else { $i++ } }; \"CRLF: $crlfCount, LF-only: $lfCount\")"
+    ]
+  }
+}

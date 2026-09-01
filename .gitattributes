@@ -1,0 +1,17 @@
+* text=auto
+
+# 项目文本统一使用 LF，避免跨平台提交产生整文件 diff
+*.java text eol=lf
+*.md text eol=lf
+*.xml text eol=lf
+*.properties text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.bat text eol=crlf
+
+# 二进制资源不参与文本换行处理
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary

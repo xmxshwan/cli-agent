@@ -363,7 +363,7 @@ public final class InlineRenderer implements Renderer {
             char ch = text.charAt(i);
             lineBuffer.append(ch);
             if (ch == '\n') {
-                String line = lineBuffer.toString();
+                String line = lineBuffer.toString().replace("\r\n", "\n").replace('\r', '\n');
                 lineBuffer.setLength(0);
                 processStreamedLine(line);
             }
@@ -703,7 +703,7 @@ public final class InlineRenderer implements Renderer {
     private record BlockEntry(FoldableBlock block) implements TranscriptEntry {
         @Override
         public String render() {
-            return String.join(System.lineSeparator(), block.currentLines()) + System.lineSeparator();
+            return String.join("\n", block.currentLines()) + "\n";
         }
     }
 }

@@ -50,6 +50,7 @@ public class CodeRetriever implements AutoCloseable {
     public List<VectorStore.SearchResult> hybridSearch(String query, int topK) throws Exception {
         Map<String, VectorStore.SearchResult> merged = new LinkedHashMap<>();
         Set<String> dualMatchBonused = new HashSet<>();
+        Map<String, Double> keywordBoosts = new HashMap<>();
 
         // 1. 语义检索
         int semanticLimit = Math.max(topK * 2, 10);
@@ -61,6 +62,8 @@ public class CodeRetriever implements AutoCloseable {
         Set<String> keywords = RagQueryTokenizer.tokenize(query);
         for (String keyword : keywords) {
             for (VectorStore.SearchResult result : keywordSearch(keyword)) {
+                String key = result.filePath() + "#" + result.name();
+                keywordBoosts.merge(key, keywordBonus(result, keyword), Math::max);
                 mergeResult(merged, boostKeywordMatch(result, keyword), dualMatchBonused);
             }
         }
@@ -68,13 +71,15 @@ public class CodeRetriever implements AutoCloseable {
         // 3. 代码类型加分：method/class 比 file 更直接回答"怎么实现"
         List<VectorStore.SearchResult> ranked = new ArrayList<>();
         for (VectorStore.SearchResult r : merged.values()) {
+            String key = r.filePath() + "#" + r.name();
             double typeBoost = switch (r.chunkType()) {
                 case "method" -> 0.15;
                 case "class" -> 0.10;
                 default -> 0.0;
             };
-            ranked.add(typeBoost == 0.0 ? r : new VectorStore.SearchResult(
-                    r.filePath(), r.chunkType(), r.name(), r.content(), r.similarity() + typeBoost));
+            double totalBoost = typeBoost + keywordBoosts.getOrDefault(key, 0.0);
+            ranked.add(totalBoost == 0.0 ? r : new VectorStore.SearchResult(
+                    r.filePath(), r.chunkType(), r.name(), r.content(), r.similarity() + totalBoost));
         }
 
         ranked.sort(Comparator.comparingDouble(VectorStore.SearchResult::similarity).reversed());
@@ -101,6 +106,18 @@ public class CodeRetriever implements AutoCloseable {
     }
 
     private VectorStore.SearchResult boostKeywordMatch(VectorStore.SearchResult result, String keyword) {
+        double bonus = keywordBonus(result, keyword);
+
+        return new VectorStore.SearchResult(
+                result.filePath(),
+                result.chunkType(),
+                result.name(),
+                result.content(),
+                result.similarity() + bonus
+        );
+    }
+
+    private double keywordBonus(VectorStore.SearchResult result, String keyword) {
         String nameLower = result.name().toLowerCase();
         String fileLower = result.filePath().toLowerCase();
         String contentLower = result.content().toLowerCase();
@@ -117,14 +134,7 @@ public class CodeRetriever implements AutoCloseable {
         if (contentLower.contains(keywordLower)) {
             bonus += 0.1;
         }
-
-        return new VectorStore.SearchResult(
-                result.filePath(),
-                result.chunkType(),
-                result.name(),
-                result.content(),
-                result.similarity() + bonus
-        );
+        return bonus;
     }
 
     /**

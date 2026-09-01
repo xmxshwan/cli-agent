@@ -12,9 +12,9 @@ package com.paicli.agent;
  * - ERROR:     子代理在执行过程中遭遇系统级错误（例如 LLM 调用失败），调用方需识别并优雅处理
  */
 public record AgentMessage(
-        String fromAgent,
-        AgentRole fromRole,
-        String content,
+        String fromAgent,  // 谁发的："orchestrator" / "planner" / "worker-1"
+        AgentRole fromRole,    // 什么角色：PLANNER / WORKER / REVIEWER
+        String content,// 消息内容
         Type type
 ) {
     public enum Type {

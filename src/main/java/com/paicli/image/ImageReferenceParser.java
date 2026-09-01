@@ -156,13 +156,26 @@ public class ImageReferenceParser {
     private static String fileUriToLocalPath(String value) {
         String afterScheme = value.substring("file://".length());
         String pathPart;
-        if (afterScheme.startsWith("/")) {
+        // Windows 上常见的剪贴板格式是 file://C:\\path\\image.png，
+        // 不能把它误判成带 host 的 URI 并拼成 /C:\\...。
+        if (afterScheme.matches("^[A-Za-z]:[\\\\/].*")) {
+            pathPart = afterScheme;
+        } else if (afterScheme.startsWith("/")) {
             pathPart = afterScheme;
         } else {
             int slashIdx = afterScheme.indexOf('/');
             pathPart = slashIdx < 0 ? "/" + afterScheme : afterScheme.substring(slashIdx);
         }
-        return percentDecodeUtf8(pathPart);
+        String decoded = percentDecodeUtf8(pathPart);
+        // file:///C:/... 是标准 URI 形式；Windows Path 不接受前置的根斜杠。
+        if (isWindows() && decoded.matches("^/[A-Za-z]:[\\\\/].*")) {
+            decoded = decoded.substring(1);
+        }
+        return decoded;
+    }
+
+    private static boolean isWindows() {
+        return java.io.File.separatorChar == '\\';
     }
 
     private static String percentDecodeUtf8(String s) {

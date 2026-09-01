@@ -17,7 +17,10 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-
+/*
+* ▎ StreamableHttpTransport 通过 OkHttpClient 发起 HTTP POST 请求实现 MCP 通信，首次连接时从响应头获取 Mcp-Session-Id 维持会话，响应可以是普通 JSON 或 SSE 流（通过 parseSse()
+  ▎ 解析）。它与 StdioTransport 共享同一 McpTransport 接口，上层 JsonRpcClient 和 McpClient 无需关心底层是本地子进程还是远程 HTTP 服务。
+* */
 public class StreamableHttpTransport implements McpTransport {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final MediaType JSON = MediaType.parse("application/json");
@@ -40,6 +43,7 @@ public class StreamableHttpTransport implements McpTransport {
 
     @Override
     public void send(JsonNode message) throws IOException {
+        //构建HTTP PoST1请求
         RequestBody body = RequestBody.create(MAPPER.writeValueAsString(message), JSON);
         Request.Builder builder = new Request.Builder()
                 .url(url)
@@ -47,6 +51,8 @@ public class StreamableHttpTransport implements McpTransport {
                 .header("Accept", "application/json, text/event-stream")
                 .header("MCP-Protocol-Version", McpInitializeRequest.PROTOCOL_VERSION)
                 .post(body);
+
+        // ★ 重要：第二次请求起，带上 sessionId
         headers.forEach(builder::header);
         if (sessionId != null && !sessionId.isBlank()) {
             builder.header("Mcp-Session-Id", sessionId);

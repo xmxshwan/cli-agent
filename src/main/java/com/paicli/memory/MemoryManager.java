@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+
 /**
  * Memory 管理器 - Memory 系统的门面类
  *
@@ -250,13 +251,22 @@ public class MemoryManager {
 
     private static String normalizeProjectKey(String path) {
         try {
-            Path candidate = Path.of(path).toAbsolutePath().normalize();
+            String normalizedInput = path.replace('\\', '/');
+            Path candidate = Path.of(path).normalize();
             if (java.nio.file.Files.exists(candidate)) {
-                return candidate.toRealPath().toString();
+                return projectKey(candidate.toRealPath().toString());
             }
-            return candidate.toString();
+            // 保留不存在的 Unix 风格绝对路径，避免在 Windows 上被错误映射到当前盘符。
+            if (normalizedInput.startsWith("/") && !normalizedInput.matches("^/[A-Za-z]:/.*")) {
+                return normalizedInput;
+            }
+            return projectKey(candidate.toAbsolutePath().toString());
         } catch (Exception e) {
-            return Path.of(path).toAbsolutePath().normalize().toString();
+            return projectKey(Path.of(path).toAbsolutePath().normalize().toString());
         }
+    }
+
+    private static String projectKey(String path) {
+        return path.replace('\\', '/');
     }
 }

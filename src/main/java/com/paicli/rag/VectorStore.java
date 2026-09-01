@@ -20,7 +20,7 @@ public class VectorStore implements AutoCloseable {
     private final String projectPath;
 
     public VectorStore(String projectPath) throws SQLException {
-        this.projectPath = projectPath;
+        this.projectPath = Path.of(projectPath).toAbsolutePath().normalize().toString();
         String dbDir = System.getProperty("paicli.rag.dir",
                 System.getProperty("user.home") + "/.paicli/rag");
         java.io.File dir = new java.io.File(dbDir);

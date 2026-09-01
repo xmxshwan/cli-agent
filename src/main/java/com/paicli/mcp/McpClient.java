@@ -27,9 +27,9 @@ public class McpClient implements AutoCloseable {
     private static final String INITIALIZE_TIMEOUT_PROPERTY = "paicli.mcp.initialize.timeout.seconds";
     private static final String INITIALIZE_TIMEOUT_ENV = "PAICLI_MCP_INITIALIZE_TIMEOUT_SECONDS";
 
-    private final String serverName;
-    private final JsonRpcClient rpc;
-    private final McpTransport transport;
+    private final String serverName; // 对哪个 Server 通信
+    private final JsonRpcClient rpc; // 用于 JSON-RPC 通信的客户端
+    private final McpTransport transport;// 通过传输层收发数据
     private volatile JsonNode serverCapabilities = JsonNodeFactory.instance.objectNode();
 
     public McpClient(String serverName, McpTransport transport) {
@@ -68,6 +68,7 @@ public class McpClient implements AutoCloseable {
         return serverCapabilities.has("prompts");
     }
 
+    //// ★ 方法 1：获取工具列表
     public List<McpToolDescriptor> listTools() throws IOException {
         JsonNode result = rpc.request("tools/list", JsonNodeFactory.instance.objectNode(), 30);
         JsonNode tools = result.path("tools");
@@ -96,7 +97,7 @@ public class McpClient implements AutoCloseable {
     public String callTool(String toolName, String argumentsJson) throws IOException {
         return callToolOutput(toolName, argumentsJson).text();
     }
-
+    // ★ 方法 2：调用工具
     public ToolOutput callToolOutput(String toolName, String argumentsJson) throws IOException {
         JsonNode args;
         if (argumentsJson == null || argumentsJson.isBlank()) {
@@ -114,6 +115,7 @@ public class McpClient implements AutoCloseable {
         return output;
     }
 
+    //★ 方法 3：获取资源列表（可选）
     public List<McpResourceDescriptor> listResources() throws IOException {
         try {
             JsonNode result = rpc.request("resources/list", JsonNodeFactory.instance.objectNode(), 30);

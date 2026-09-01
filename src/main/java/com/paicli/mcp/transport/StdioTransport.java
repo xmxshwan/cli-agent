@@ -17,7 +17,11 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-
+/*
+* ▎ StdioTransport 通过 ProcessBuilder 启动 MCP Server 子进程，用两个后台线程分别读取 stdout（解析 JSON 消息派发给监听器）和 stderr（存入环形缓冲区供用户查看），写入通过
+  ▎ BufferedWriter 写入子进程的 stdin。关闭时采取 3 阶段终止策略（关 stdin → SIGTERM → SIGKILL），确保子进程能被干净地终止。它是 PaiCLI 连接本地 MCP
+  ▎ Server（npx/uvx）的默认传输方式。
+* */
 public class StdioTransport implements McpTransport {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int MAX_STDERR_LINES = 200;

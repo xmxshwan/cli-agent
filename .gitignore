@@ -2,14 +2,22 @@
 .env
 .paicli/
 
+# 本机 Agent / IDE 配置
+.claude/settings.local.json
+.idea/
+.vscode/
+
+# 崩溃转储与临时文件
+*.stackdump
+*.tmp
+*.bak
+
 # 编译输出
 target/
 *.class
 
 # IDE
-.idea/
 *.iml
-.vscode/
 
 # 日志
 *.log

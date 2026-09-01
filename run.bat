@@ -1,38 +1,36 @@
 @echo off
 setlocal
 
-set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot
-set MAVEN_HOME=D:\AAA_xmx\maven\apache-maven-3.9.9
-set PATH=%JAVA_HOME%\bin;%MAVEN_HOME%\bin;%PATH%
-
 cd /d "%~dp0"
 
-if "%1"=="build" goto :build
-if "%1"=="test" goto :test
-if "%1"=="rebuild" goto :rebuild
+where java >nul 2>&1 || (
+    echo [PaiCLI] Java was not found on PATH. Install Java 17 or newer.
+    exit /b 1
+)
+
+if /i "%~1"=="build" goto build
+if /i "%~1"=="test" goto test
+if /i "%~1"=="rebuild" goto rebuild
+goto run
 
 :run
-echo [PaiCLI] 启动中...
-java -jar target\paicli-1.0-SNAPSHOT.jar %*
-goto :end
+if not exist "target\paicli-1.0-SNAPSHOT.jar" (
+    echo [PaiCLI] JAR not found. Run "run.bat build" first.
+    exit /b 1
+)
+java -jar "target\paicli-1.0-SNAPSHOT.jar" %*
+exit /b %errorlevel%
 
 :build
-echo [PaiCLI] 编译项目...
 call mvn clean package
-goto :end
+exit /b %errorlevel%
 
 :rebuild
-echo [PaiCLI] 重新编译并启动...
 call mvn clean package
-if exist target\paicli-1.0-SNAPSHOT.jar (
-    java -jar target\paicli-1.0-SNAPSHOT.jar
-)
-goto :end
+if errorlevel 1 exit /b %errorlevel%
+java -jar "target\paicli-1.0-SNAPSHOT.jar"
+exit /b %errorlevel%
 
 :test
-echo [PaiCLI] 运行测试...
 call mvn test -Pquick
-goto :end
-
-:end
-endlocal
+exit /b %errorlevel%

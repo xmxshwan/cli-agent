@@ -399,24 +399,31 @@ public class McpServerManager implements AutoCloseable {
     }
 
     private void start(McpServer server) {
-        unregisterTools(server);
-        server.close();
+        unregisterTools(server);// 1. 清理旧工具
+        server.close();// 2. 关闭旧连接
         if (server.config().isDisabled()) {
             server.status(McpServerStatus.DISABLED);
             return;
         }
-        server.status(McpServerStatus.STARTING);
+        server.status(McpServerStatus.STARTING);// 3. 标记为"启动中"
         server.errorMessage(null);
         try {
+            // 4. 展开环境变量 ${VAR} 并校验配置
             // 在单 server 启动路径里展开 ${VAR} 与校验 transport，
             // 单个失败仅标 ERROR，不会阻塞其他 server。
             configLoader.prepare(server.config());
+            // 5. 根据配置创建传输层
             McpTransport transport = createTransport(server.config());
+            // 6. 创建 MCP 客户端，发送 initialize 握手
             McpClient client = new McpClient(server.name(), transport);
             client.initialize();
+            // 7. 注册通知处理器
             registerNotificationHandlers(server, client);
+            // 8. 获取工具列表 + 资源列表
             List<McpToolDescriptor> tools = buildToolList(server, client);
+            // 9. 注册到 ToolRegistry（关键步骤！）
             replaceTools(server, client, tools);
+            // 10. 标记就绪
             server.client(client);
             server.tools(tools);
             server.markStarted();
@@ -450,7 +457,7 @@ public class McpServerManager implements AutoCloseable {
         return McpResourceTool.LIST_RESOURCES.equals(descriptor.name())
                 || McpResourceTool.READ_RESOURCE.equals(descriptor.name());
     }
-
+    // MCP Server 可以在运行时主动通知工具变更 MCP Server 运行时新增了工具，PaiCLI 也能动态感知并更新，不需要重启 Agent
     private void registerNotificationHandlers(McpServer server, McpClient client) {
         NotificationRouter router = new NotificationRouter();
         router.on("notifications/tools/list_changed", ignored -> {

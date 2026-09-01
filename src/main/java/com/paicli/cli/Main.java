@@ -190,8 +190,11 @@ public class Main {
     }
 
     public static void main(String[] args) {
+        //启动前置
         configureAwtForCli();
+        //如果是运行时服务命令，则启动运行时服务并阻塞
         if (isRuntimeServeCommand(args)) {
+            //配置日志
             configureLogging();
             startRuntimeApiAndBlock(args);
             return;
@@ -199,6 +202,8 @@ public class Main {
 
         configureLogging();
 
+        //阶段1  基础设施初始化
+        //1.1配置和创建LLM客户端
         PaiCliConfig config = PaiCliConfig.load();
         LlmClient llmClient = LlmClientFactory.createFromConfig(config);
         if (llmClient == null) {
@@ -208,6 +213,7 @@ public class Main {
         }
         AtomicReference<LlmClient> llmClientRef = new AtomicReference<>(llmClient);
 
+        //1.2 终端初始化 配置和创建Hitl工具
         try (Terminal terminal = TerminalBuilder.builder().system(true).dumb(true).build()) {
             refreshTerminalColumns(terminal);
             TerminalHitlHandler terminalHitlHandler = new TerminalHitlHandler(false);
@@ -252,8 +258,14 @@ public class Main {
             configureSlashCommandHint(lineReader);
             configureJLineInteractiveWidgets(lineReader);
 
+
+            //阶段2 子系统初始化
+            //这个阶段创建了所有"运行时子系统"，是初始化最密集的部分。
+
             // JLine-first：启动输出、命令输出、Agent 流式内容都走同一条 Renderer.stream() 通道。
             // inline 首屏要挂到 LineReader 首次初始化回调里，避免在 readLine 接管屏幕前用裸输出抢光标。
+
+            //2.1渲染器
             Renderer renderer = RendererFactory.create(RendererFactory.resolveMode(), terminal);
             RendererHitlHandler rendererHitl = new RendererHitlHandler(renderer, hitlHandler.isEnabled());
             hitlHandler.setDelegate(rendererHitl);
@@ -265,6 +277,8 @@ public class Main {
             renderer.updateStatus(statusInfo(llmClient, hitlHandler, "idle", mcpServerManager, null));
 
             String startupNote = "";
+
+            //2.3 MCP系统初始化，加载MCP配置并启动MCP服务器
             try {
                 McpConfigBootstrapResult bootstrapResult = ensureDefaultMcpConfig(Path.of(System.getProperty("user.home")));
                 if (!bootstrapResult.message().isBlank()) {
@@ -279,7 +293,7 @@ public class Main {
             AtMentionExpander mentionExpander = new AtMentionExpander(mcpServerManager);
             LocalPathMentionExpander localPathMentionExpander = new LocalPathMentionExpander(Path.of("."));
 
-            // === Skill 系统初始化 ===
+            // 2.4 Skill 系统初始化
             Path home = Path.of(System.getProperty("user.home"));
             Path skillsCacheDir = home.resolve(".paicli/skills-cache");
             Path userSkillsDir = home.resolve(".paicli/skills");
@@ -298,6 +312,7 @@ public class Main {
             hitlToolRegistry.setSkillRegistry(skillRegistry);
             hitlToolRegistry.setSkillContextBuffer(skillContextBuffer);
 
+            //2.5 Agent和Task Manager
             Agent reactAgent = new Agent(llmClient, hitlToolRegistry);
             reactAgent.setExternalContextSupplier(mcpServerManager::resourceIndexForPrompt);
             reactAgent.setSkillRegistry(skillRegistry);
@@ -305,6 +320,8 @@ public class Main {
             DurableTaskManager taskManager = openTaskManager(llmClientRef);
             taskManager.start();
             Runtime.getRuntime().addShutdownHook(new Thread(taskManager::close, "paicli-task-shutdown"));
+
+            //阶段3：启动画面
             renderer.updateStatus(statusInfo(reactAgent, mcpServerManager, skillRegistry, "idle"));
             StartupScreenInfo startupScreenInfo = startupScreenInfo(llmClient, mcpServerManager, skillRegistry, startupNote);
             if (renderer instanceof InlineRenderer inline) {
@@ -314,6 +331,9 @@ public class Main {
             }
             boolean nextTaskUsePlanMode = false;
             boolean nextTaskUseTeamMode = false;
+
+
+            //阶段4：主循环（整个程序的核心，也是一个状态机）
 
             // === TUI / CLI 分支判断 ===
             // 旧 PAICLI_TUI=true 路径仍走 Lanterna 全屏 TUI（Day 5 后由 LanternaRenderer 接管）。
@@ -343,6 +363,7 @@ public class Main {
             bindCtrlVToClipboardImage(lineReader);
             bindEscToClearInput(lineReader);
 
+            //4.1主循环流程图
             while (true) {
                 refreshTerminalColumns(terminal);
                 PromptInput promptInput;
@@ -383,6 +404,14 @@ public class Main {
                     printSubmittedInput(renderer, ui, input);
                     submittedInputRendered = true;
                 }
+
+                //4.2 命令分发（核心代码）
+                //38种命令类型，每种的处理逻辑
+                /*
+                * 设计要点“：
+                * - 所有斜杠命令都在 CLI 层直接处理，不让 LLM 知道
+                  `/plan` 和 `/team` 设置的是"下一条任务模式标志"，执行完后自动重置回 ReAct
+                * */
                 switch (command.type()) {
                     case UNKNOWN_COMMAND -> {
                         ui.println("❌ 未知命令: " + command.payload());

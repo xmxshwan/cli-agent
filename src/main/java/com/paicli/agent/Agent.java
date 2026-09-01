@@ -41,6 +41,13 @@ import java.util.function.Supplier;
 /**
  * Agent 核心类 - 实现 ReAct 循环
  */
+
+/*
+* ▎ ReAct 循环是整个 PaiCLI 的执行引擎，核心是 conversationHistory + toolDefinitions → LLM → tool_calls → executeTools → 结果回灌 → 继续循环 的 think-act-observe
+  ▎ 闭环。ToolRegistry 统一管理 9 个内置工具（文件/代码/Shell/Web）和动态注册的 MCP 工具，通过 mcp__{server}__{tool} 命名规约区分，执行时最多 4 个并行，结果按原始顺序返回。Agent
+  ▎ 退出条件只有两个：LLM 自决不再调工具，或预算（Token/死循环/硬轮数）耗尽。
+* */
+
 public class Agent {
     private static final Logger log = LoggerFactory.getLogger(Agent.class);
     private LlmClient llmClient;
@@ -120,7 +127,7 @@ public class Agent {
      */
     public String run(String userInput) {
         log.info("ReAct run started: inputLength={}", userInput == null ? 0 : userInput.length());
-        pruneHistoricalImagePayloads();
+        pruneHistoricalImagePayloads(); // 第 130 行 — 清理历史图片，省 token
         // 存入短期记忆
         memoryManager.addUserMessage(userInput);
         storeExplicitBrowserMemoryHint(userInput);
@@ -168,13 +175,14 @@ public class Agent {
             int iteration = budget.beginIteration();
 
             try {
-                List<LlmClient.Tool> toolDefinitions = toolRegistry.getToolDefinitions();
+                List<LlmClient.Tool> toolDefinitions = toolRegistry.getToolDefinitions();//获取工具定义
                 logRequestContext("react iteration=" + iteration, toolDefinitions);
                 streamRenderer.beginThinking();
                 // 调用 LLM
+                //这一行就是 ReAct 的"think"阶段——把历史 + 全部工具说明书发给 LLM。
                 LlmClient.ChatResponse response = llmClient.chat(
-                        conversationHistory,
-                        toolDefinitions,
+                        conversationHistory,//本轮的所有消息
+                        toolDefinitions,//所有工具的 name + description + parameters
                         streamRenderer
                 );
                 LlmTraceLogger.logReasoning(log, "react iteration=" + iteration, llmClient, response.reasoningContent());
@@ -207,8 +215,8 @@ public class Agent {
 
                     List<ToolExecutionResult> toolResults = executeToolCalls(response.toolCalls(), iteration);
                     for (ToolExecutionResult toolResult : toolResults) {
-                        memoryManager.addToolResult(toolResult.name(), toolResult.result());
-                        conversationHistory.add(LlmClient.Message.tool(toolResult.id(), toolResult.result()));
+                        memoryManager.addToolResult(toolResult.name(), toolResult.result());//写入短期记忆
+                        conversationHistory.add(LlmClient.Message.tool(toolResult.id(), toolResult.result()));//结果回灌历史
                     }
                     appendImageToolMessages(toolResults);
                     pushStatus(budget, startNanos, "running");

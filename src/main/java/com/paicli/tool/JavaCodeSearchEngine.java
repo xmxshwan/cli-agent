@@ -97,7 +97,9 @@ final class JavaCodeSearchEngine implements CodeSearchEngine {
                 return;
             }
             List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-            String fileKey = relative.toString();
+            // 工具输出使用仓库统一的 POSIX 路径，避免 Windows 的反斜杠破坏
+            // golden set、suggested_reads 以及跨平台 Agent 上下文。
+            String fileKey = relative.toString().replace('\\', '/');
             for (int i = 0; i < lines.size() && matches.size() < request.maxResults(); i++) {
                 int currentFileMatches = perFileMatches.getOrDefault(fileKey, 0);
                 if (currentFileMatches >= request.headLimit()) {

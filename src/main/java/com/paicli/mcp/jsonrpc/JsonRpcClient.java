@@ -16,6 +16,10 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
+/*
+*  总结：JsonRpcClient = JSON-RPC 2.0 协议的 Java 实现，它没有"增加"异步功能，而是把这个协议本来就有的异步请求-响应模型，用 CompletableFuture 封装成了方便 Java 代码调用的
+  API。去掉它，McpClient 就得自己处理 id 分配、消息匹配、超时、通知分发这些脏活。
+* */
 public class JsonRpcClient implements AutoCloseable {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final long DEFAULT_TIMEOUT_SECONDS = 60;
